@@ -58,27 +58,54 @@ class NewsClient:
         else:
             print("Failed to post story.")
 
-    def get_news(self, params=None):
-        if params is None:
-            params = {}
-
-        response = requests.get(f"{self.base_url}/api/news/", params=params)
-
+    def get_news(self, agency=None, cat=None, reg=None, date=None):
+        response = requests.get("https://newssites.pythonanywhere.com/api/directory/")
         if response.status_code == 200:
-            data = response.json().get('news')
-            if data:
-                print("\n=== News ===\n")
-                for idx, news_item in enumerate(data, start=1):
-                    print(f"News {idx}:")
-                    print(f"  Headline: {news_item.get('headline')}")
-                    print(f"  Category: {news_item.get('category')}")
-                    print(f"  Region: {news_item.get('region')}")
-                    print(f"  Date: {news_item.get('date')}")
-                    print(f"  Details: {news_item.get('details')}\n")
-            else:
-                print("No news found.")
+            try:
+                data = response.json()
+                if isinstance(data, list):
+                    for agency_info in data:
+                        if not isinstance(agency_info, dict):
+                            print("Invalid data format for agency info. Skipping.")
+                            continue
+                        agency_code = agency_info.get('agency_code')
+                        if agency and agency_code != agency:
+                            continue
+                        agency_url = agency_info.get('url')
+                        news_url = f"{agency_url}/api/stories"
+                        
+                        # Construct payload for news request
+                        payload = {}
+                        if cat:
+                            payload['story_cat'] = cat
+                        if reg:
+                            payload['story_region'] = reg
+                        if date:
+                            payload['story_date'] = date
+
+                        news_response = requests.get(news_url, params=payload)
+                        
+                        if news_response.status_code == 200:
+                            news_data = news_response.json()
+                            if isinstance(news_data, list):
+                                print(f"\n=== News from {agency_code} ===\n")
+                                for news_item in news_data:
+                                    if not isinstance(news_item, dict):
+                                        print("Invalid data format for news item. Skipping.")
+                                        continue
+                                    print(f"Headline: {news_item.get('headline')}")
+                                    print(f"Category: {news_item.get('story_cat')}")
+                                    print(f"Region: {news_item.get('story_region')}")
+                                    print(f"Date: {news_item.get('story_date')}")
+                                    print(f"Details: {news_item.get('story_details')}\n")
+                            else:
+                                print(f"No news found from {agency_code}.")
+                        else:
+                            print(f"Failed to fetch news from {agency_code}: {news_response.text}")
+            except Exception as e:
+                print(f"Error occurred: {e}")
         else:
-            print(f"Failed to fetch news: {response.text}")
+            print(f"Failed to fetch agencies: {response.text}")
 
     def register_agency(self, agency_name, url, agency_code):
         if not self.logged_in:
@@ -100,21 +127,15 @@ class NewsClient:
     def list_agencies(self, url):
         response = requests.get(url)
         if response.status_code == 200:
-            try:
-                data = response.json()
-                if isinstance(data, list):
-                    if data:
-                        print("\n=== Agencies ===\n")
-                        for agency in data:
-                            print(f"Agency Name: {agency.get('agency_name')}")
-                            print(f"URL: {agency.get('url')}")
-                            print(f"Agency Code: {agency.get('agency_code')}\n")
-                    else:
-                        print("No agencies found.")
-                else:
-                    print("Error: Response data is not a list.")
-            except Exception as e:
-                print(f"Error occurred: {e}")
+            data = response.json()
+            if isinstance(data, list):
+                print("\n=== Agencies ===\n")
+                for agency in data:
+                    print(f"Agency Name: {agency.get('agency_name')}")
+                    print(f"URL: {agency.get('url')}")
+                    print(f"Agency Code: {agency.get('agency_code')}\n")
+            else:
+                print("No agencies found.")
         else:
             print(f"Failed to fetch agencies: {response.text}")
 
@@ -129,9 +150,10 @@ class NewsClient:
             print(f"Failed to delete story: {response.text}")
 
 client = NewsClient()
+debug=False
 
 while True:
-    command = input("Enter command (login, logout, post, news, register, list, delete, exit): ").lower()
+    command = input("Enter command (login, logout, post, news, list, delete, exit): ").lower()
     
     if command == "login":
         url = input("Enter login URL: ")
@@ -140,21 +162,15 @@ while True:
         client.logout()
     elif command == "post":
         client.post_story()
-    elif command.startswith("news"):
-        # Parse command options
-        params = {}
-        options = command.split()[1:]
-        for option in options:
-            key, value = option.split("=")
-            params[key.strip("-")] = value
-        client.get_news(params)
-    elif command == "register":
-        agency_name = input("Enter agency name: ")
-        url = input("Enter agency website URL: ")
-        agency_code = input("Enter agency code: ")
-        client.register_agency(agency_name, url, agency_code)
+    elif command == "news":
+        agency = input("Enter news agency code (optional): ")
+        cat = input("Enter news category (optional): ")
+        reg = input("Enter region (optional): ")
+        date = input("Enter date (optional): ")
+        client.get_news(agency, cat, reg, date)
     elif command == "list":
-        client.list_agencies("https://newssites.pythonanywhere.com/api/directory/")
+        url = input("Enter directory URL: ")
+        client.list_agencies(url)
     elif command == "delete":
         story_key = input("Enter story key to delete: ")
         client.delete_story(story_key)
