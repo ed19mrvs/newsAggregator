@@ -80,18 +80,41 @@ class NewsClient:
         else:
             print(f"Failed to fetch news: {response.text}")
 
-    def list_agencies(self):
-        response = requests.get(f"{self.base_url}api/directory/")
+    def register_agency(self, agency_name, url, agency_code):
+        if not self.logged_in:
+            print("Please log in first.")
+            return
+        
+        payload = {
+            "agency_name": agency_name,
+            "url": url,
+            "agency_code": agency_code
+        }
+        headers = {'Content-Type': 'application/json'}  
+        response = requests.post(f"{self.base_url}/api/directory/", json=payload, headers=headers)
+        if response.status_code == 201:
+            print("Agency registered successfully.")
+        else:
+            print(f"Failed to register agency: {response.text}")
+
+    def list_agencies(self, url):
+        response = requests.get(url)
         if response.status_code == 200:
-            data = response.json().get('agency_list')
-            if data:
-                print("\n=== Agencies ===\n")
-                for agency in data:
-                    print(f"Agency Name: {agency.get('agency_name')}")
-                    print(f"URL: {agency.get('url')}")
-                    print(f"Agency Code: {agency.get('agency_code')}\n")
-            else:
-                print("No agencies found.")
+            try:
+                data = response.json()
+                if isinstance(data, list):
+                    if data:
+                        print("\n=== Agencies ===\n")
+                        for agency in data:
+                            print(f"Agency Name: {agency.get('agency_name')}")
+                            print(f"URL: {agency.get('url')}")
+                            print(f"Agency Code: {agency.get('agency_code')}\n")
+                    else:
+                        print("No agencies found.")
+                else:
+                    print("Error: Response data is not a list.")
+            except Exception as e:
+                print(f"Error occurred: {e}")
         else:
             print(f"Failed to fetch agencies: {response.text}")
 
@@ -108,7 +131,7 @@ class NewsClient:
 client = NewsClient()
 
 while True:
-    command = input("Enter command (login, logout, post, news, list, delete, exit): ").lower()
+    command = input("Enter command (login, logout, post, news, register, list, delete, exit): ").lower()
     
     if command == "login":
         url = input("Enter login URL: ")
@@ -125,8 +148,13 @@ while True:
             key, value = option.split("=")
             params[key.strip("-")] = value
         client.get_news(params)
+    elif command == "register":
+        agency_name = input("Enter agency name: ")
+        url = input("Enter agency website URL: ")
+        agency_code = input("Enter agency code: ")
+        client.register_agency(agency_name, url, agency_code)
     elif command == "list":
-        client.list_agencies()
+        client.list_agencies("https://newssites.pythonanywhere.com/api/directory/")
     elif command == "delete":
         story_key = input("Enter story key to delete: ")
         client.delete_story(story_key)
