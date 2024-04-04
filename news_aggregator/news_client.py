@@ -73,15 +73,21 @@ class NewsClient:
                             continue
                         agency_url = agency_info.get('url')
                         news_url = f"{agency_url}/api/stories"
-                        
+
                         # Construct payload for news request
                         payload = {}
                         if cat:
                             payload['story_cat'] = cat
+                        else:
+                            payload['story_cat'] = "*"
                         if reg:
                             payload['story_region'] = reg
+                        else:
+                            payload['story_region'] = "*"
                         if date:
                             payload['story_date'] = date
+                        else:
+                            payload['story_date'] = "*"
 
                         news_response = requests.get(news_url, params=payload)
                         
